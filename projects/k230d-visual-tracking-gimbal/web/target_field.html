@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>AI Tracking Range - Target Field</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; overflow: hidden; }
+canvas { display: block; }
+#hud {
+  position: fixed; top: 10px; left: 10px;
+  color: #0f0; font: 14px monospace;
+  background: rgba(0,0,0,.6); padding: 8px 12px; border-radius: 6px;
+}
+#controls {
+  position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 10px;
+}
+#controls button {
+  background: #222; color: #fff; border: 1px solid #555;
+  padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+}
+#controls button:hover { background: #444; }
+#controls button.active { border-color: #0f0; color: #0f0; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div>Mode: <span id="mode-label">RANDOM</span></div>
+  <div>Targets: <span id="target-count">3</span></div>
+  <div>Speed: <span id="speed-label">1.0x</span></div>
+</div>
+<div id="controls">
+  <button onclick="setMode('random')" id="btn-random" class="active">Random</button>
+  <button onclick="setMode('circle')" id="btn-circle">Circle</button>
+  <button onclick="setMode('zigzag')" id="btn-zigzag">Zigzag</button>
+  <button onclick="changeCount(-1)">- Target</button>
+  <button onclick="changeCount(1)">+ Target</button>
+  <button onclick="changeSpeed(-0.5)">Slower</button>
+  <button onclick="changeSpeed(0.5)">Faster</button>
+</div>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Config
+let mode = 'random';
+let targetCount = 3;
+let speedMul = 1.0;
+const TARGET_RADIUS = 30;
+const TARGET_COLOR = '#ff2020';
+const DECOY_COLOR = '#2060ff';
+
+// Targets
+let targets = [];
+let decoys = [];
+let t = 0;
+
+function createTarget(i) {
+  return {
+    x: Math.random() * (W - 100) + 50,
+    y: Math.random() * (H - 100) + 50,
+    vx: (Math.random() - 0.5) * 4,
+    vy: (Math.random() - 0.5) * 4,
+    phase: Math.random() * Math.PI * 2,
+    idx: i,
+  };
+}
+
+function createDecoy() {
+  return {
+    x: Math.random() * W,
+    y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 2,
+    vy: (Math.random() - 0.5) * 2,
+    size: 15 + Math.random() * 10,
+  };
+}
+
+function initTargets() {
+  targets = [];
+  for (let i = 0; i < targetCount; i++) targets.push(createTarget(i));
+  decoys = [];
+  for (let i = 0; i < 5; i++) decoys.push(createDecoy());
+}
+initTargets();
+
+function updateRandom(tgt, dt) {
+  tgt.x += tgt.vx * speedMul * dt;
+  tgt.y += tgt.vy * speedMul * dt;
+  if (tgt.x < TARGET_RADIUS || tgt.x > W - TARGET_RADIUS) tgt.vx *= -1;
+  if (tgt.y < TARGET_RADIUS || tgt.y > H - TARGET_RADIUS) tgt.vy *= -1;
+  tgt.x = Math.max(TARGET_RADIUS, Math.min(W - TARGET_RADIUS, tgt.x));
+  tgt.y = Math.max(TARGET_RADIUS, Math.min(H - TARGET_RADIUS, tgt.y));
+}
+
+function updateCircle(tgt, dt) {
+  const cx = W / 2, cy = H / 2;
+  const r = Math.min(W, H) * 0.3;
+  const angle = t * 0.001 * speedMul + tgt.phase;
+  tgt.x = cx + Math.cos(angle) * r;
+  tgt.y = cy + Math.sin(angle) * r;
+}
+
+function updateZigzag(tgt, dt) {
+  const period = 3000 / speedMul;
+  const progress = ((t + tgt.phase * 1000) % period) / period;
+  const segment = Math.floor(progress * 4);
+  const frac = (progress * 4) - segment;
+  const margin = 60;
+  const points = [
+    [margin, margin],
+    [W - margin, H / 2],
+    [margin, H - margin],
+    [W - margin, margin],
+  ];
+  const p0 = points[segment % 4];
+  const p1 = points[(segment + 1) % 4];
+  tgt.x = p0[0] + (p1[0] - p0[0]) * frac;
+  tgt.y = p0[1] + (p1[1] - p0[1]) * frac;
+}
+
+function drawTarget(tgt, color) {
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(tgt.x, tgt.y, TARGET_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  // Inner ring
+  ctx.beginPath();
+  ctx.arc(tgt.x, tgt.y, TARGET_RADIUS * 0.6, 0, Math.PI * 2);
+  ctx.fillStyle = '#111';
+  ctx.fill();
+  // Bullseye
+  ctx.beginPath();
+  ctx.arc(tgt.x, tgt.y, TARGET_RADIUS * 0.25, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawDecoy(d) {
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(t * 0.002);
+  ctx.fillStyle = DECOY_COLOR;
+  ctx.fillRect(-d.size/2, -d.size/2, d.size, d.size);
+  ctx.restore();
+}
+
+let lastTime = performance.now();
+function frame(now) {
+  const dt = Math.min((now - lastTime) / 16.67, 3);
+  lastTime = now;
+  t = now;
+
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines for visual reference
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 80) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 80) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // Update & draw decoys
+  for (const d of decoys) {
+    d.x += d.vx * dt; d.y += d.vy * dt;
+    if (d.x < 0 || d.x > W) d.vx *= -1;
+    if (d.y < 0 || d.y > H) d.vy *= -1;
+    drawDecoy(d);
+  }
+
+  // Update & draw targets
+  for (const tgt of targets) {
+    if (mode === 'random') updateRandom(tgt, dt);
+    else if (mode === 'circle') updateCircle(tgt, dt);
+    else if (mode === 'zigzag') updateZigzag(tgt, dt);
+    drawTarget(tgt, TARGET_COLOR);
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// Controls
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m).classList.add('active');
+  document.getElementById('mode-label').textContent = m.toUpperCase();
+}
+
+function changeCount(delta) {
+  targetCount = Math.max(1, Math.min(8, targetCount + delta));
+  document.getElementById('target-count').textContent = targetCount;
+  initTargets();
+}
+
+function changeSpeed(delta) {
+  speedMul = Math.max(0.5, Math.min(5, speedMul + delta));
+  document.getElementById('speed-label').textContent = speedMul.toFixed(1) + 'x';
+}
+</script>
+</body>
+</html>

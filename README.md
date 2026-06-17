@@ -1,163 +1,50 @@
-# K230矩形检测与激光定位系统
+﻿# K230 / K230D Vision Projects
 
-基于K230开发板的实时A4纸张矩形检测与激光定位系统，专为2025年电子设计竞赛E题开发。
+本仓库用于整理 K230/K230D 视觉识别、显示交互、串口控制和上位机调参相关项目。
 
-## 功能特性
+## 项目列表
 
-- **实时矩形检测**: 使用计算机视觉技术检测A4纸张
-- **智能筛选算法**: 基于面积和宽高比筛选最佳矩形
-- **激光定位系统**: 计算检测中心与激光点的偏差
-- **手动校准模式**: 触摸屏交互式激光位置校准
-- **串口通信**: 实时发送定位数据
-- **双模式切换**: 长按3秒切换检测/校准模式
+### 1. K230 矩形检测与激光定位系统
 
-## 硬件要求
+原始项目位于仓库根目录的 `src/`、`config/`、`docs/`、`examples/`。该项目用于 A4 纸张矩形检测、激光点偏差计算和串口数据输出。
 
-- **开发板**: K230开发板
-- **摄像头**: 支持480×320分辨率
-- **显示屏**: 800×480 LCD显示屏（ST7701驱动）
-- **触摸屏**: 电容触摸屏
-- **串口**: UART2 (115200波特率)
-- **激光器**: 定位用激光点
+主要入口：
 
-## 项目结构
+- `src/rectangle_detection.py`
+- `config/detection_config.py`
+- `docs/hardware_setup.md`
 
-```
-├── src/                    # 源代码目录
-│   └── rectangle_detection.py  # 主程序
-├── config/                 # 配置文件
-│   └── detection_config.py     # 检测参数配置
-├── docs/                   # 文档目录
-│   ├── API.md             # API文档
-│   ├── hardware_setup.md  # 硬件配置说明
-│   └── troubleshooting.md # 故障排除指南
-├── examples/               # 示例代码
-├── README.md              # 项目说明
-├── requirements.txt       # 依赖列表
-└── LICENSE               # 许可证
+### 2. K230D 视觉追踪云台靶场
+
+新增项目位于：
+
+```text
+projects/k230d-visual-tracking-gimbal/
 ```
 
-## 快速开始
+该项目基于庐山派 Lite K230D CanMV：
 
-### 1. 硬件连接
+- 摄像头 + ST7701 本地显示。
+- LAB 色块视觉追踪。
+- UART3/UART4 控制 X/Y 两轴张大头 X42_V1.3 闭环步进驱动。
+- PC 网页无线调参上位机。
+- 阶段性评测报告和测试照片。
 
-- 将摄像头连接到K230开发板
-- 连接LCD显示屏和触摸屏
-- 配置UART2串口（TX: Pin11, RX: Pin12）
-- 安装激光器定位装置
+快速入口：
 
-### 2. 软件部署
+- `projects/k230d-visual-tracking-gimbal/README.md`
+- `projects/k230d-visual-tracking-gimbal/k230d/tracking_main.py`
+- `projects/k230d-visual-tracking-gimbal/pc_tools/wireless_tuning_bridge.py`
+- `projects/k230d-visual-tracking-gimbal/docs/K230D_庐山派Lite_阶段性评测报告.md`
 
-```bash
-# 将src/rectangle_detection.py复制到K230开发板
-# 根据需要修改config/detection_config.py中的参数
-```
+## 依赖说明
 
-### 3. 运行程序
+K230/K230D 板端代码运行在 CanMV MicroPython 环境中。PC 上位机部分优先使用 Python 标准库，避免额外依赖。
 
-```python
-# 在K230开发板上运行
-python rectangle_detection.py
-```
+## 隐私说明
 
-## 使用说明
+公开代码中的 WiFi SSID、密码和个人本地路径均已脱敏。运行前请在本地配置实际网络参数。
 
-### 检测模式 (Mode 1)
-- 自动检测A4纸张矩形
-- 显示检测结果和中心点
-- 计算与激光点的偏差
-- 通过串口发送定位数据
+## License
 
-### 校准模式 (Mode 2)
-- 短按触摸屏设置新的激光位置
-- 显示十字准线辅助定位
-- 实时更新激光坐标
-
-### 模式切换
-- 长按触摸屏3秒切换模式
-- 模式指示显示在屏幕上
-
-## 串口数据格式
-
-```
-格式: @XXXXXYYYYY!
-说明:
-  @ - 起始标志
-  XXXXX - X轴偏差 (5位: 符号位+4位数值)
-  YYYYY - Y轴偏差 (5位: 符号位+4位数值)
-  ! - 结束标志
-
-示例:
-  @0012000050! - X轴+12像素, Y轴+5像素
-  @1003010020! - X轴-30像素, Y轴-20像素
-  @2000020000! - 未检测到目标
-```
-
-## 配置参数
-
-主要配置参数位于 `config/detection_config.py`:
-
-- `DEFAULT_LASER_X/Y`: 激光器初始位置
-- `CANNY_THRESH1/2`: 边缘检测阈值
-- `MIN/MAX_AREA`: 面积筛选范围
-- `MIN/MAX_ASPECT_RATIO`: 宽高比筛选范围
-- `DEAD_ZONE`: 控制死区大小
-
-## 性能指标
-
-- **检测精度**: ±2像素
-- **帧率**: 约15-25 FPS
-- **响应时间**: <100ms
-- **检测范围**: 支持A4纸张各种角度
-
-## 故障排除
-
-### 常见问题
-
-1. **无法检测矩形**
-   - 检查光照条件
-   - 调整边缘检测阈值
-   - 确保A4纸张边缘清晰
-
-2. **触摸不响应**
-   - 检查触摸屏连接
-   - 确认触摸驱动正常
-
-3. **串口无数据**
-   - 检查串口连接和波特率
-   - 确认UART引脚配置
-
-详细故障排除请参考 `docs/troubleshooting.md`
-
-## 开发说明
-
-### 代码结构
-
-- `err_handling()`: 误差处理和串口通信
-- `calculate_center()`: 矩形中心点计算
-- `sort_corners()`: 角点排序算法
-- 主循环: 图像处理和模式控制
-
-### 扩展功能
-
-可以基于现有代码扩展:
-- 多目标检测
-- 不同形状识别
-- 网络通信功能
-- 数据记录功能
-
-## 许可证
-
-本项目采用 GNU General Public License v3.0 许可证。
-
-## 贡献
-
-欢迎提交Issue和Pull Request来改进项目。
-
-## 联系方式
-
-- 项目维护者: KoneFly
-- GitHub: https://github.com/KoneFly/-
-
----
-**注意**: 本项目专为学术竞赛开发，请确保在合规的环境中使用。
+见 `LICENSE`。
